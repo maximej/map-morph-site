@@ -39,7 +39,7 @@ function smoothstep(edge0, edge1, value) {
   return t * t * (3 - 2 * t);
 }
 
-function currentProjection(clipped = false) {
+function currentProjection() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, wrapT);
@@ -53,22 +53,18 @@ function currentProjection(clipped = false) {
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
     .rotate(rotation.map(component => component * wrapT));
 
-  if (clipped) {
-    const maskProgress = smoothstep(.18, .85, wrapT);
-    projection.clipAngle(150 - 60 * easeCubicInOut(maskProgress));
+  if (wrapT > .22) {
+    const maskProgress = smoothstep(.22, 1, wrapT);
+    projection.clipAngle(175 - 85 * easeCubicInOut(maskProgress));
   }
   return projection;
 }
 
-function drawLayer(projection, alpha) {
-  if (alpha <= 0) return;
+function drawLayer(projection) {
   const path = geoPath(projection, context);
   context.save();
-  context.globalAlpha = alpha;
   context.beginPath();
   path({ type: "Sphere" });
-  context.fillStyle = "#f3efe5";
-  context.fill();
   context.clip();
 
   context.beginPath();
@@ -93,13 +89,7 @@ function drawLayer(projection, alpha) {
 function draw() {
   if (!land) return;
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-  const clipMix = smoothstep(.18, .85, wrapT);
-  // Both layers use the same interpolated geometry. Only their visibility
-  // masks differ, so the flat world can curl continuously into a hemisphere.
-  // Keep the clipped globe opaque underneath. Fading two translucent layers
-  // simultaneously lowered their combined alpha and caused a white flash.
-  drawLayer(currentProjection(true), 1);
-  drawLayer(currentProjection(false), 1 - clipMix);
+  drawLayer(currentProjection());
 }
 
 function stopInertia() {
@@ -115,7 +105,7 @@ function startInertia() {
     const elapsed = Math.min(32, now - previous);
     previous = now;
     rotation[0] += angularVelocity[0] * elapsed;
-    rotation[1] = Math.max(-75, Math.min(75, rotation[1] + angularVelocity[1] * elapsed));
+    rotation[1] += angularVelocity[1] * elapsed;
     const damping = Math.exp(-.0048 * elapsed);
     angularVelocity[0] *= damping;
     angularVelocity[1] *= damping;
@@ -132,20 +122,20 @@ function animateWrap(target) {
   const startWrap = wrapT;
   const startCenter = centerT;
   const begin = performance.now();
-  const duration = reducedMotion.matches ? 0 : 1250;
+  const duration = reducedMotion.matches ? 0 : 1650;
 
   const frame = now => {
     const progress = duration ? Math.min(1, (now - begin) / duration) : 1;
     if (target === 1) {
       // Recenter first, then continuously bend the full map into a globe.
       centerT = startCenter + (1 - startCenter) * easeCubicInOut(Math.min(1, progress / .2));
-      const fold = Math.max(0, (progress - .16) / .84);
+      const fold = Math.max(0, (progress - .12) / .88);
       wrapT = startWrap + (1 - startWrap) * easeCubicInOut(fold);
     } else {
       // Reveal the rear hemisphere while flattening, then restore the resting
       // offset after the map is fully unfolded.
-      wrapT = startWrap * (1 - easeCubicInOut(Math.min(1, progress / .86)));
-      const settle = Math.max(0, (progress - .8) / .2);
+      wrapT = startWrap * (1 - easeCubicInOut(Math.min(1, progress / .9)));
+      const settle = Math.max(0, (progress - .84) / .16);
       centerT = startCenter * (1 - easeCubicInOut(settle));
     }
     draw();
@@ -191,7 +181,7 @@ canvas.addEventListener("pointermove", event => {
   const elapsed = Math.max(8, now - lastPointerTime);
   const delta = [(next[0] - lastPointer[0]) * .34, -(next[1] - lastPointer[1]) * .34];
   rotation[0] += delta[0];
-  rotation[1] = Math.max(-75, Math.min(75, rotation[1] + delta[1]));
+  rotation[1] += delta[1];
   angularVelocity = [delta[0] / elapsed, delta[1] / elapsed];
   lastPointer = next;
   lastPointerTime = now;
