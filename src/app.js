@@ -67,7 +67,7 @@ function drawLayer(projection, alpha) {
   context.globalAlpha = alpha;
   context.beginPath();
   path({ type: "Sphere" });
-  context.fillStyle = "#fffdf7";
+  context.fillStyle = "#f3efe5";
   context.fill();
   context.clip();
 
@@ -96,8 +96,10 @@ function draw() {
   const clipMix = smoothstep(.18, .85, wrapT);
   // Both layers use the same interpolated geometry. Only their visibility
   // masks differ, so the flat world can curl continuously into a hemisphere.
+  // Keep the clipped globe opaque underneath. Fading two translucent layers
+  // simultaneously lowered their combined alpha and caused a white flash.
+  drawLayer(currentProjection(true), 1);
   drawLayer(currentProjection(false), 1 - clipMix);
-  drawLayer(currentProjection(true), clipMix);
 }
 
 function stopInertia() {
