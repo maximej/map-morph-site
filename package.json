@@ -1,0 +1,19 @@
+{
+  "name": "map-morph-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "d3-ease": "^3.0.1",
+    "d3-geo": "^3.1.1",
+    "d3-geo-projection": "^4.0.0",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
