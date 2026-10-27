@@ -18,12 +18,13 @@ test("le rendu ne dessine aucune frontiere interieure", async () => {
   assert.match(source, /startInertia/);
   assert.match(source, /flatOutline = 1 - smoothstep\(0, \.22, wrapT\)/);
   assert.match(source, /globeOutline = smoothstep\(\.78, 1, wrapT\)/);
-  assert.match(source, /if \(wrapT <= \.25\)/);
-  assert.match(source, /drawLayer\(currentProjection\(false\), 1, flatOutline\)/);
-  assert.match(source, /drawLayer\(currentProjection\(false\), 1 - clipReveal, 0\)/);
-  assert.match(source, /drawLayer\(currentProjection\(true\), 1, globeOutline\)/);
-  assert.match(source, /clipAngle\(150 - 60/);
+  assert.match(source, /globeReveal = smoothstep\(\.68, 1, wrapT\)/);
+  assert.match(source, /drawLayer\(flatContext, currentProjection\(\), 1, flatOutline\)/);
+  assert.match(source, /drawLayer\(globeContext, globeProjection\(\), 1, globeOutline\)/);
+  assert.match(source, /geoOrthographic\(\)/);
+  assert.doesNotMatch(source, /currentProjection\(true\)/);
   assert.doesNotMatch(source, /context\.clip\(\)/);
+  assert.match(source, /planarHeight = 2 \* Math\.PI/);
   assert.doesNotMatch(source, /fillStyle = "#f3efe5"/);
   assert.doesNotMatch(source, /Math\.max\(-75/);
   assert.doesNotMatch(source, /revealT/);

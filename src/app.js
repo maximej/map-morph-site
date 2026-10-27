@@ -1,4 +1,4 @@
-import { geoGraticule10, geoOrthographicRaw, geoPath, geoProjection } from "d3-geo";
+import { geoGraticule10, geoOrthographic, geoOrthographicRaw, geoPath, geoProjection } from "d3-geo";
 import { easeCubicInOut } from "d3-ease";
 import { feature } from "topojson-client";
 import { interpolateRaw, planarRaw } from "./projection-math.js";
@@ -9,7 +9,12 @@ const slider = document.querySelector("#morph");
 const value = document.querySelector("#morphValue");
 const wrapButton = document.querySelector("#wrap");
 const context = canvas.getContext("2d");
+const flatBuffer = document.createElement("canvas");
+const globeBuffer = document.createElement("canvas");
+const flatContext = flatBuffer.getContext("2d");
+const globeContext = globeBuffer.getContext("2d");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const PAPER = "#f3efe5";
 
 let land;
 let flatT = 0;
@@ -30,7 +35,13 @@ function resize() {
   const rect = stage.getBoundingClientRect();
   canvas.width = Math.round(rect.width * ratio);
   canvas.height = Math.round(rect.height * ratio);
+  flatBuffer.width = canvas.width;
+  flatBuffer.height = canvas.height;
+  globeBuffer.width = canvas.width;
+  globeBuffer.height = canvas.height;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  flatContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+  globeContext.setTransform(ratio, 0, 0, ratio, 0, 0);
   draw();
 }
 
@@ -39,12 +50,14 @@ function smoothstep(edge0, edge1, value) {
   return t * t * (3 - 2 * t);
 }
 
-function currentProjection(clipped = false) {
+function currentProjection() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, wrapT);
   const projection = geoProjection(raw).precision(.15);
-  const planeScale = Math.min(width / 6.75, height / 3.85);
+  const planarWidth = 2 * Math.PI + (5.306001713 - 2 * Math.PI) * flatT;
+  const planarHeight = 2 * Math.PI + (2.652999475 - 2 * Math.PI) * flatT;
+  const planeScale = Math.min(width * .86 / planarWidth, height * .70 / planarHeight);
   const globeScale = Math.min(width, height) * .39 * zoom;
   const restingOffset = Math.min(28, height * .035);
 
@@ -53,58 +66,80 @@ function currentProjection(clipped = false) {
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
     .rotate(rotation.map(component => component * wrapT));
 
-  // A spherical clip is undefined for our nearly planar custom projection in
-  // some browsers. Only introduce it once the map is visibly curved.
-  if (clipped)
-    projection.clipAngle(150 - 60 * easeCubicInOut(smoothstep(.25, 1, wrapT)));
   return projection;
 }
 
-function drawLayer(projection, alpha, outlineAlpha) {
+function globeProjection() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  const globeScale = Math.min(width, height) * .39 * zoom;
+  return geoOrthographic()
+    .precision(.15)
+    .clipAngle(90)
+    .scale(globeScale)
+    .translate([width / 2, height / 2])
+    .rotate(rotation);
+}
+
+function drawLayer(target, projection, alpha, outlineAlpha) {
   if (alpha <= 0) return;
-  const path = geoPath(projection, context);
-  context.save();
-  context.globalAlpha = alpha;
+  const path = geoPath(projection, target);
+  target.save();
+  target.globalAlpha = alpha;
 
-  context.beginPath();
+  target.beginPath();
   path(geoGraticule10());
-  context.strokeStyle = "rgba(48,57,76,.22)";
-  context.lineWidth = .7;
-  context.stroke();
+  target.strokeStyle = "rgba(48,57,76,.22)";
+  target.lineWidth = .7;
+  target.stroke();
 
-  context.beginPath();
+  target.beginPath();
   path(land);
-  context.fillStyle = "#4e88b7";
-  context.fill();
+  target.fillStyle = "#4e88b7";
+  target.fill();
 
-  context.globalAlpha = outlineAlpha;
-  context.beginPath();
+  target.globalAlpha = outlineAlpha;
+  target.beginPath();
   path({ type: "Sphere" });
-  context.strokeStyle = "#30394c";
-  context.lineWidth = 1.25;
-  context.stroke();
-  context.restore();
+  target.strokeStyle = "#30394c";
+  target.lineWidth = 1.25;
+  target.stroke();
+  target.restore();
+}
+
+function clearBuffer(target) {
+  target.save();
+  target.globalAlpha = 1;
+  target.fillStyle = PAPER;
+  target.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  target.restore();
 }
 
 function draw() {
   if (!land) return;
-  context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
   const globeOutline = smoothstep(.78, 1, wrapT);
-  const clipReveal = smoothstep(.25, .55, wrapT);
+  const globeReveal = smoothstep(.68, 1, wrapT);
 
-  if (wrapT <= .25) {
-    // The planisphere never receives a spherical clip. This avoids the
-    // browser-dependent empty or sliced paths seen in Firefox and Chrome.
-    drawLayer(currentProjection(false), 1, flatOutline);
-  } else {
-    // Paint the clipped layer fully opaque over the fading planar layer. Its
-    // solid pixels replace—not accumulate with—the layer below, preventing a
-    // visible overlap band along the moving clip boundary.
-    if (clipReveal < 1)
-      drawLayer(currentProjection(false), 1 - clipReveal, 0);
-    drawLayer(currentProjection(true), 1, globeOutline);
+  // Never apply a spherical clip to the interpolated raw projection: Chrome
+  // and Firefox disagree on that invalid intermediate geometry. Instead,
+  // crossfade two complete opaque frames near the end of the fold. Because
+  // both buffers contain the exact paper colour, transparency cannot expose
+  // a seam or create a darker overlap band.
+  clearBuffer(flatContext);
+  drawLayer(flatContext, currentProjection(), 1, flatOutline);
+  clearBuffer(globeContext);
+  drawLayer(globeContext, globeProjection(), 1, globeOutline);
+
+  context.save();
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.globalAlpha = 1;
+  context.drawImage(flatBuffer, 0, 0);
+  if (globeReveal > 0) {
+    context.globalAlpha = globeReveal;
+    context.drawImage(globeBuffer, 0, 0);
   }
+  context.restore();
 }
 
 function stopInertia() {
