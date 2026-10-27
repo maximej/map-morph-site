@@ -11,13 +11,13 @@
 <body>
   <main class="stage" id="stageShell">
     <canvas id="map" aria-label="Carte interactive : projection Mercator vers Eckert IV"></canvas>
-    <div class="message" aria-live="polite"><span>correct</span><span>the map</span></div>
     <section class="controls" aria-label="Commandes cartographiques">
+      <div class="message" aria-live="polite"><span>correct</span><span>the map</span></div>
       <div class="slider-row">
-        <span aria-hidden="true">M</span>
+        <span aria-hidden="true">Mercator</span>
         <label class="sr-only" for="morph">Transition Mercator vers Eckert IV</label>
         <input id="morph" type="range" min="0" max="100" value="0">
-        <span aria-hidden="true">E IV</span>
+        <span aria-hidden="true">Eckert IV</span>
         <output id="morphValue" for="morph">0 %</output>
       </div>
       <button id="wrap" type="button" aria-pressed="false">

@@ -8,6 +8,15 @@ test("le site expose les deux interactions principales", async () => {
   assert.match(html, /id="morph"/);
   assert.match(html, /id="wrap"/);
   assert.match(html, /Eckert IV/);
+  assert.match(html, />Mercator</);
+  assert.doesNotMatch(html, /aria-hidden="true">M</);
+});
+
+test("le rendu ne dessine aucune frontiere interieure", async () => {
+  const source = await readFile(new URL("./src/app.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /\bmesh\b|\bborders\b/);
+  assert.match(source, /startInertia/);
+  assert.match(source, /clipAngle\(179\.999/);
 });
 
 test("la transition Mercator-Eckert reste finie et monotone jusqu'aux poles", () => {
