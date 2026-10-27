@@ -54,7 +54,7 @@ function currentProjection(clipped = false) {
     .rotate(rotation.map(component => component * wrapT));
 
   if (clipped)
-    projection.clipAngle(150 - 60 * easeCubicInOut(smoothstep(0, 1, wrapT)));
+    projection.clipAngle(179.999 - 89.999 * easeCubicInOut(smoothstep(0, 1, wrapT)));
   return projection;
 }
 
@@ -90,14 +90,12 @@ function drawLayer(projection, alpha, outlineAlpha) {
 function draw() {
   if (!land) return;
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-  const clipMix = smoothstep(0, 1, wrapT);
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
   const globeOutline = smoothstep(.78, 1, wrapT);
-  // Crossfade only vector strokes and land fills—never an opaque ocean. The
-  // two projections share the exact same raw morph, so no clipping threshold
-  // or white layer can create a jump or flash.
-  drawLayer(currentProjection(true), Math.sqrt(clipMix), globeOutline);
-  drawLayer(currentProjection(false), Math.sqrt(1 - clipMix), flatOutline);
+  // Draw the continuously morphing geometry only once. Crossfading a clipped
+  // and an unclipped copy made their semi-transparent overlap visible as a
+  // horizontal band at the moving clip boundary.
+  drawLayer(currentProjection(true), 1, Math.max(flatOutline, globeOutline));
 }
 
 function stopInertia() {
