@@ -20,7 +20,8 @@ test("le rendu ne dessine aucune frontiere interieure", async () => {
   assert.match(source, /globeOutline = smoothstep\(\.78, 1, wrapT\)/);
   assert.match(source, /drawLayer\(currentProjection\(true\), 1, Math\.max\(flatOutline, globeOutline\)\)/);
   assert.doesNotMatch(source, /drawLayer\(currentProjection\(false\)/);
-  assert.match(source, /clipAngle\(179\.999 - 89\.999/);
+  assert.match(source, /clipped && wrapT > \.001/);
+  assert.match(source, /clipAngle\(175 - 85/);
   assert.doesNotMatch(source, /fillStyle = "#f3efe5"/);
   assert.doesNotMatch(source, /Math\.max\(-75/);
   assert.doesNotMatch(source, /revealT/);

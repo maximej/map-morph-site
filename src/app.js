@@ -53,8 +53,12 @@ function currentProjection(clipped = false) {
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
     .rotate(rotation.map(component => component * wrapT));
 
-  if (clipped)
-    projection.clipAngle(179.999 - 89.999 * easeCubicInOut(smoothstep(0, 1, wrapT)));
+  // D3's spherical clip becomes degenerate at an angle extremely close to
+  // 180 degrees with the custom planar raw projections. Leave it disabled at
+  // the flat endpoint, then close a stable 175-degree aperture smoothly to
+  // the orthographic globe's 90 degrees.
+  if (clipped && wrapT > .001)
+    projection.clipAngle(175 - 85 * easeCubicInOut(smoothstep(0, 1, wrapT)));
   return projection;
 }
 
