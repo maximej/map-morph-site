@@ -65,9 +65,6 @@ function drawLayer(projection, alpha, outlineAlpha) {
   const path = geoPath(projection, context);
   context.save();
   context.globalAlpha = alpha;
-  context.beginPath();
-  path({ type: "Sphere" });
-  context.clip();
 
   context.beginPath();
   path(geoGraticule10());
