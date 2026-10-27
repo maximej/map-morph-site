@@ -16,8 +16,9 @@ test("le rendu ne dessine aucune frontiere interieure", async () => {
   const source = await readFile(new URL("./src/app.js", import.meta.url), "utf8");
   assert.doesNotMatch(source, /\bmesh\b|\bborders\b/);
   assert.match(source, /startInertia/);
-  assert.match(source, /if \(wrapT > 0\) projection\.clipAngle/);
-  assert.match(source, /revealT/);
+  assert.match(source, /drawLayer\(currentProjection\(false\), 1 - clipMix\)/);
+  assert.match(source, /drawLayer\(currentProjection\(true\), clipMix\)/);
+  assert.doesNotMatch(source, /revealT/);
 });
 
 test("la transition Mercator-Eckert reste finie et monotone jusqu'aux poles", () => {

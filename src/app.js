@@ -15,7 +15,6 @@ let land;
 let flatT = 0;
 let wrapT = 0;
 let centerT = 0;
-let revealT = 1;
 let globe = false;
 let transitionFrame;
 let inertiaFrame;
@@ -35,7 +34,12 @@ function resize() {
   draw();
 }
 
-function currentProjection() {
+function smoothstep(edge0, edge1, value) {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function currentProjection(clipped = false) {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, wrapT);
@@ -45,24 +49,22 @@ function currentProjection() {
   const restingOffset = Math.min(28, height * .035);
 
   projection
-    .scale((planeScale + (globeScale - planeScale) * wrapT) * Math.max(.001, revealT))
+    .scale(planeScale + (globeScale - planeScale) * wrapT)
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
     .rotate(rotation.map(component => component * wrapT));
 
-  // Planispheres require D3's antimeridian clip. The circular globe clip
-  // collapses a custom flat projection to a line at 180 degrees.
-  if (wrapT > 0) projection.clipAngle(179.999 - 89.999 * easeCubicInOut(wrapT));
+  if (clipped) {
+    const maskProgress = smoothstep(.18, .85, wrapT);
+    projection.clipAngle(150 - 60 * easeCubicInOut(maskProgress));
+  }
   return projection;
 }
 
-function draw() {
-  if (!land) return;
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  context.clearRect(0, 0, width, height);
-  const path = geoPath(currentProjection(), context);
-
+function drawLayer(projection, alpha) {
+  if (alpha <= 0) return;
+  const path = geoPath(projection, context);
   context.save();
+  context.globalAlpha = alpha;
   context.beginPath();
   path({ type: "Sphere" });
   context.fillStyle = "#fffdf7";
@@ -79,13 +81,23 @@ function draw() {
   path(land);
   context.fillStyle = "#4e88b7";
   context.fill();
-  context.restore();
 
   context.beginPath();
   path({ type: "Sphere" });
   context.strokeStyle = "#30394c";
   context.lineWidth = 1.25;
   context.stroke();
+  context.restore();
+}
+
+function draw() {
+  if (!land) return;
+  context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  const clipMix = smoothstep(.18, .85, wrapT);
+  // Both layers use the same interpolated geometry. Only their visibility
+  // masks differ, so the flat world can curl continuously into a hemisphere.
+  drawLayer(currentProjection(false), 1 - clipMix);
+  drawLayer(currentProjection(true), clipMix);
 }
 
 function stopInertia() {
@@ -117,37 +129,21 @@ function animateWrap(target) {
   stopInertia();
   const startWrap = wrapT;
   const startCenter = centerT;
-  const startReveal = revealT;
   const begin = performance.now();
   const duration = reducedMotion.matches ? 0 : 1250;
 
   const frame = now => {
     const progress = duration ? Math.min(1, (now - begin) / duration) : 1;
     if (target === 1) {
-      // Recenter, fold the flat map to a point, change clipping while hidden,
-      // then open it smoothly as a globe.
-      centerT = startCenter + (1 - startCenter) * easeCubicInOut(Math.min(1, progress / .22));
-      if (progress < .34) {
-        wrapT = startWrap;
-        const foldAway = Math.max(0, (progress - .2) / .14);
-        revealT = startReveal * (1 - easeCubicInOut(foldAway));
-      } else {
-        const fold = (progress - .34) / .66;
-        wrapT = startWrap + (1 - startWrap) * easeCubicInOut(fold);
-        revealT = easeCubicInOut(Math.min(1, (progress - .34) / .2));
-      }
+      // Recenter first, then continuously bend the full map into a globe.
+      centerT = startCenter + (1 - startCenter) * easeCubicInOut(Math.min(1, progress / .2));
+      const fold = Math.max(0, (progress - .16) / .84);
+      wrapT = startWrap + (1 - startWrap) * easeCubicInOut(fold);
     } else {
-      // Close the globe before restoring the antimeridian clip, then unfold
-      // the complete planisphere and return it to its resting position.
-      if (progress < .62) {
-        wrapT = startWrap * (1 - easeCubicInOut(Math.min(1, progress / .7)));
-        const foldAway = Math.max(0, (progress - .48) / .14);
-        revealT = startReveal * (1 - easeCubicInOut(foldAway));
-      } else {
-        wrapT = 0;
-        revealT = easeCubicInOut(Math.min(1, (progress - .62) / .2));
-      }
-      const settle = Math.max(0, (progress - .76) / .24);
+      // Reveal the rear hemisphere while flattening, then restore the resting
+      // offset after the map is fully unfolded.
+      wrapT = startWrap * (1 - easeCubicInOut(Math.min(1, progress / .86)));
+      const settle = Math.max(0, (progress - .8) / .2);
       centerT = startCenter * (1 - easeCubicInOut(settle));
     }
     draw();
