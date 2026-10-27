@@ -15,6 +15,7 @@ let land;
 let flatT = 0;
 let wrapT = 0;
 let centerT = 0;
+let revealT = 1;
 let globe = false;
 let transitionFrame;
 let inertiaFrame;
@@ -43,13 +44,15 @@ function currentProjection() {
   const globeScale = Math.min(width, height) * .39 * zoom;
   const restingOffset = Math.min(28, height * .035);
 
-  return projection
-    .scale(planeScale + (globeScale - planeScale) * wrapT)
+  projection
+    .scale((planeScale + (globeScale - planeScale) * wrapT) * Math.max(.001, revealT))
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
-    .rotate(rotation.map(component => component * wrapT))
-    // Use the same circular preclip throughout. Changing from the default
-    // antimeridian clip on click was the source of the visible jump.
-    .clipAngle(179.999 - 89.999 * easeCubicInOut(wrapT));
+    .rotate(rotation.map(component => component * wrapT));
+
+  // Planispheres require D3's antimeridian clip. The circular globe clip
+  // collapses a custom flat projection to a line at 180 degrees.
+  if (wrapT > 0) projection.clipAngle(179.999 - 89.999 * easeCubicInOut(wrapT));
+  return projection;
 }
 
 function draw() {
@@ -114,21 +117,37 @@ function animateWrap(target) {
   stopInertia();
   const startWrap = wrapT;
   const startCenter = centerT;
+  const startReveal = revealT;
   const begin = performance.now();
   const duration = reducedMotion.matches ? 0 : 1250;
 
   const frame = now => {
     const progress = duration ? Math.min(1, (now - begin) / duration) : 1;
     if (target === 1) {
-      // First recentre the map, then fold it into the globe.
-      centerT = startCenter + (1 - startCenter) * easeCubicInOut(Math.min(1, progress / .28));
-      const fold = Math.max(0, (progress - .24) / .76);
-      wrapT = startWrap + (1 - startWrap) * easeCubicInOut(fold);
+      // Recenter, fold the flat map to a point, change clipping while hidden,
+      // then open it smoothly as a globe.
+      centerT = startCenter + (1 - startCenter) * easeCubicInOut(Math.min(1, progress / .22));
+      if (progress < .34) {
+        wrapT = startWrap;
+        const foldAway = Math.max(0, (progress - .2) / .14);
+        revealT = startReveal * (1 - easeCubicInOut(foldAway));
+      } else {
+        const fold = (progress - .34) / .66;
+        wrapT = startWrap + (1 - startWrap) * easeCubicInOut(fold);
+        revealT = easeCubicInOut(Math.min(1, (progress - .34) / .2));
+      }
     } else {
-      // Unfold completely before returning to the planisphere resting place.
-      const unfold = Math.min(1, progress / .76);
-      wrapT = startWrap * (1 - easeCubicInOut(unfold));
-      const settle = Math.max(0, (progress - .72) / .28);
+      // Close the globe before restoring the antimeridian clip, then unfold
+      // the complete planisphere and return it to its resting position.
+      if (progress < .62) {
+        wrapT = startWrap * (1 - easeCubicInOut(Math.min(1, progress / .7)));
+        const foldAway = Math.max(0, (progress - .48) / .14);
+        revealT = startReveal * (1 - easeCubicInOut(foldAway));
+      } else {
+        wrapT = 0;
+        revealT = easeCubicInOut(Math.min(1, (progress - .62) / .2));
+      }
+      const settle = Math.max(0, (progress - .76) / .24);
       centerT = startCenter * (1 - easeCubicInOut(settle));
     }
     draw();
