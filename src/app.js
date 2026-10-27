@@ -58,7 +58,7 @@ function currentProjection(clipped = false) {
   return projection;
 }
 
-function drawLayer(projection, alpha) {
+function drawLayer(projection, alpha, outlineAlpha) {
   if (alpha <= 0) return;
   const path = geoPath(projection, context);
   context.save();
@@ -78,6 +78,7 @@ function drawLayer(projection, alpha) {
   context.fillStyle = "#4e88b7";
   context.fill();
 
+  context.globalAlpha = outlineAlpha;
   context.beginPath();
   path({ type: "Sphere" });
   context.strokeStyle = "#30394c";
@@ -90,11 +91,13 @@ function draw() {
   if (!land) return;
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   const clipMix = smoothstep(0, 1, wrapT);
+  const flatOutline = 1 - smoothstep(0, .22, wrapT);
+  const globeOutline = smoothstep(.78, 1, wrapT);
   // Crossfade only vector strokes and land fills—never an opaque ocean. The
   // two projections share the exact same raw morph, so no clipping threshold
   // or white layer can create a jump or flash.
-  drawLayer(currentProjection(true), Math.sqrt(clipMix));
-  drawLayer(currentProjection(false), Math.sqrt(1 - clipMix));
+  drawLayer(currentProjection(true), Math.sqrt(clipMix), globeOutline);
+  drawLayer(currentProjection(false), Math.sqrt(1 - clipMix), flatOutline);
 }
 
 function stopInertia() {

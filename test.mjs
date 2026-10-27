@@ -16,8 +16,10 @@ test("le rendu ne dessine aucune frontiere interieure", async () => {
   const source = await readFile(new URL("./src/app.js", import.meta.url), "utf8");
   assert.doesNotMatch(source, /\bmesh\b|\bborders\b/);
   assert.match(source, /startInertia/);
-  assert.match(source, /drawLayer\(currentProjection\(true\), Math\.sqrt\(clipMix\)\)/);
-  assert.match(source, /drawLayer\(currentProjection\(false\), Math\.sqrt\(1 - clipMix\)\)/);
+  assert.match(source, /flatOutline = 1 - smoothstep\(0, \.22, wrapT\)/);
+  assert.match(source, /globeOutline = smoothstep\(\.78, 1, wrapT\)/);
+  assert.match(source, /drawLayer\(currentProjection\(true\), Math\.sqrt\(clipMix\), globeOutline\)/);
+  assert.match(source, /drawLayer\(currentProjection\(false\), Math\.sqrt\(1 - clipMix\), flatOutline\)/);
   assert.doesNotMatch(source, /fillStyle = "#f3efe5"/);
   assert.doesNotMatch(source, /Math\.max\(-75/);
   assert.doesNotMatch(source, /revealT/);
