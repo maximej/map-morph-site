@@ -53,12 +53,10 @@ function currentProjection(clipped = false) {
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
     .rotate(rotation.map(component => component * wrapT));
 
-  // D3's spherical clip becomes degenerate at an angle extremely close to
-  // 180 degrees with the custom planar raw projections. Leave it disabled at
-  // the flat endpoint, then close a stable 175-degree aperture smoothly to
-  // the orthographic globe's 90 degrees.
-  if (clipped && wrapT > .001)
-    projection.clipAngle(175 - 85 * easeCubicInOut(smoothstep(0, 1, wrapT)));
+  // A spherical clip is undefined for our nearly planar custom projection in
+  // some browsers. Only introduce it once the map is visibly curved.
+  if (clipped)
+    projection.clipAngle(150 - 60 * easeCubicInOut(smoothstep(.25, 1, wrapT)));
   return projection;
 }
 
@@ -96,10 +94,20 @@ function draw() {
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
   const globeOutline = smoothstep(.78, 1, wrapT);
-  // Draw the continuously morphing geometry only once. Crossfading a clipped
-  // and an unclipped copy made their semi-transparent overlap visible as a
-  // horizontal band at the moving clip boundary.
-  drawLayer(currentProjection(true), 1, Math.max(flatOutline, globeOutline));
+  const clipReveal = smoothstep(.25, .55, wrapT);
+
+  if (wrapT <= .25) {
+    // The planisphere never receives a spherical clip. This avoids the
+    // browser-dependent empty or sliced paths seen in Firefox and Chrome.
+    drawLayer(currentProjection(false), 1, flatOutline);
+  } else {
+    // Paint the clipped layer fully opaque over the fading planar layer. Its
+    // solid pixels replace—not accumulate with—the layer below, preventing a
+    // visible overlap band along the moving clip boundary.
+    if (clipReveal < 1)
+      drawLayer(currentProjection(false), 1 - clipReveal, 0);
+    drawLayer(currentProjection(true), 1, globeOutline);
+  }
 }
 
 function stopInertia() {
