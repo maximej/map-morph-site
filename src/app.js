@@ -50,39 +50,46 @@ function smoothstep(edge0, edge1, value) {
   return t * t * (3 - 2 * t);
 }
 
-function currentProjection() {
+function projectionLayout() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  // Finish the geometric fold before the visibility hand-off. Once geometryT
-  // reaches 1, this projection and globeProjection share the same raw,
-  // position, scale and rotation, so the final dissolve cannot double edges.
-  const geometryT = easeCubicInOut(smoothstep(0, .68, wrapT));
-  const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, geometryT);
-  const projection = geoProjection(raw).precision(.15);
   const planarWidth = 2 * Math.PI + (5.306001713 - 2 * Math.PI) * flatT;
   const planarHeight = 2 * Math.PI + (2.652999475 - 2 * Math.PI) * flatT;
   const planeScale = Math.min(width * .86 / planarWidth, height * .70 / planarHeight);
   const globeScale = Math.min(width, height) * .39 * zoom;
   const restingOffset = Math.min(28, height * .035);
+  const poseT = easeCubicInOut(smoothstep(0, 1, wrapT));
+  return {
+    scale: planeScale + (globeScale - planeScale) * poseT,
+    translate: [width / 2, height / 2 - restingOffset * (1 - centerT)],
+    rotate: rotation.map(component => component * poseT)
+  };
+}
+
+function currentProjection() {
+  // Complete the surface curvature early. From 55% onward, this raw geometry
+  // exactly matches the clipped frontal globe while its pose keeps moving.
+  const shapeT = easeCubicInOut(smoothstep(0, .55, wrapT));
+  const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, shapeT);
+  const projection = geoProjection(raw).precision(.15);
+  const layout = projectionLayout();
 
   projection
-    .scale(planeScale + (globeScale - planeScale) * geometryT)
-    .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
-    .rotate(rotation.map(component => component * geometryT));
+    .scale(layout.scale)
+    .translate(layout.translate)
+    .rotate(layout.rotate);
 
   return projection;
 }
 
 function globeProjection() {
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  const globeScale = Math.min(width, height) * .39 * zoom;
+  const layout = projectionLayout();
   return geoOrthographic()
     .precision(.15)
     .clipAngle(90)
-    .scale(globeScale)
-    .translate([width / 2, height / 2])
-    .rotate(rotation);
+    .scale(layout.scale)
+    .translate(layout.translate)
+    .rotate(layout.rotate);
 }
 
 function drawLayer(target, projection, alpha, outlineAlpha) {
@@ -122,7 +129,7 @@ function clearBuffer(target) {
 function draw() {
   if (!land) return;
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
-  const globeReveal = smoothstep(.68, .80, wrapT);
+  const globeReveal = smoothstep(.55, .70, wrapT);
   const globeOutline = globeReveal;
 
   // Never apply a spherical clip to the interpolated raw projection: Chrome

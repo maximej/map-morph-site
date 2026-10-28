@@ -17,8 +17,9 @@ test("le rendu ne dessine aucune frontiere interieure", async () => {
   assert.doesNotMatch(source, /\bmesh\b|\bborders\b/);
   assert.match(source, /startInertia/);
   assert.match(source, /flatOutline = 1 - smoothstep\(0, \.22, wrapT\)/);
-  assert.match(source, /geometryT = easeCubicInOut\(smoothstep\(0, \.68, wrapT\)\)/);
-  assert.match(source, /globeReveal = smoothstep\(\.68, \.80, wrapT\)/);
+  assert.match(source, /shapeT = easeCubicInOut\(smoothstep\(0, \.55, wrapT\)\)/);
+  assert.match(source, /poseT = easeCubicInOut\(smoothstep\(0, 1, wrapT\)\)/);
+  assert.match(source, /globeReveal = smoothstep\(\.55, \.70, wrapT\)/);
   assert.match(source, /globeOutline = globeReveal/);
   assert.match(source, /drawLayer\(flatContext, currentProjection\(\), 1, flatOutline\)/);
   assert.match(source, /drawLayer\(globeContext, globeProjection\(\), 1, globeOutline\)/);
