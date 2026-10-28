@@ -53,7 +53,11 @@ function smoothstep(edge0, edge1, value) {
 function currentProjection() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, wrapT);
+  // Finish the geometric fold before the visibility hand-off. Once geometryT
+  // reaches 1, this projection and globeProjection share the same raw,
+  // position, scale and rotation, so the final dissolve cannot double edges.
+  const geometryT = easeCubicInOut(smoothstep(0, .88, wrapT));
+  const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, geometryT);
   const projection = geoProjection(raw).precision(.15);
   const planarWidth = 2 * Math.PI + (5.306001713 - 2 * Math.PI) * flatT;
   const planarHeight = 2 * Math.PI + (2.652999475 - 2 * Math.PI) * flatT;
@@ -62,9 +66,9 @@ function currentProjection() {
   const restingOffset = Math.min(28, height * .035);
 
   projection
-    .scale(planeScale + (globeScale - planeScale) * wrapT)
+    .scale(planeScale + (globeScale - planeScale) * geometryT)
     .translate([width / 2, height / 2 - restingOffset * (1 - centerT)])
-    .rotate(rotation.map(component => component * wrapT));
+    .rotate(rotation.map(component => component * geometryT));
 
   return projection;
 }
@@ -118,14 +122,14 @@ function clearBuffer(target) {
 function draw() {
   if (!land) return;
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
-  const globeOutline = smoothstep(.78, 1, wrapT);
-  const globeReveal = smoothstep(.68, 1, wrapT);
+  const globeOutline = smoothstep(.88, 1, wrapT);
+  const globeReveal = smoothstep(.88, 1, wrapT);
 
   // Never apply a spherical clip to the interpolated raw projection: Chrome
   // and Firefox disagree on that invalid intermediate geometry. Instead,
-  // crossfade two complete opaque frames near the end of the fold. Because
-  // both buffers contain the exact paper colour, transparency cannot expose
-  // a seam or create a darker overlap band.
+  // crossfade two complete opaque frames only after their front hemispheres
+  // are pixel-aligned. The dissolve then removes the rear hemisphere instead
+  // of blending two visibly different maps.
   clearBuffer(flatContext);
   drawLayer(flatContext, currentProjection(), 1, flatOutline);
   clearBuffer(globeContext);
