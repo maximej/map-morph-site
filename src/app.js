@@ -56,7 +56,7 @@ function currentProjection() {
   // Finish the geometric fold before the visibility hand-off. Once geometryT
   // reaches 1, this projection and globeProjection share the same raw,
   // position, scale and rotation, so the final dissolve cannot double edges.
-  const geometryT = easeCubicInOut(smoothstep(0, .88, wrapT));
+  const geometryT = easeCubicInOut(smoothstep(0, .68, wrapT));
   const raw = interpolateRaw(planarRaw(flatT), geoOrthographicRaw, geometryT);
   const projection = geoProjection(raw).precision(.15);
   const planarWidth = 2 * Math.PI + (5.306001713 - 2 * Math.PI) * flatT;
@@ -122,8 +122,8 @@ function clearBuffer(target) {
 function draw() {
   if (!land) return;
   const flatOutline = 1 - smoothstep(0, .22, wrapT);
-  const globeOutline = smoothstep(.88, 1, wrapT);
-  const globeReveal = smoothstep(.88, 1, wrapT);
+  const globeReveal = smoothstep(.68, .80, wrapT);
+  const globeOutline = globeReveal;
 
   // Never apply a spherical clip to the interpolated raw projection: Chrome
   // and Firefox disagree on that invalid intermediate geometry. Instead,
